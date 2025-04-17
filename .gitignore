@@ -1,0 +1,27 @@
+# Katalogi i pliki generowane przez Visual Studio
+.vs/
+.vscode/
+.idea/
+bin/
+obj/
+
+# Pliki użytkownika
+*.user
+*.suo
+*.userosscache
+
+# Paczki NuGet
+packages/
+
+# Systemy operacyjne
+Thumbs.db
+.DS_Store
+
+# Pliki tymczasowe
+*.log
+*.tmp
+
+# Pliki wykonywalne
+*.exe
+*.dll
+*.pdb
