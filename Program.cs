@@ -3,6 +3,8 @@ using Microsoft.Win32;
 using System.Data.Odbc;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Configuration;
+using System.Data.SqlClient;
 //using Microsoft.Win32;
 
 namespace BLTrapeze_v0_3
@@ -12,7 +14,7 @@ namespace BLTrapeze_v0_3
         static void Main(string[] args)
         {
 
-            // dodawania wpisu do ODBC 32
+            // dodawania wpisu do ODBC 32 PARADOX
 
 
             const string dsnName = "ParadoxT2";
@@ -48,17 +50,63 @@ namespace BLTrapeze_v0_3
                 }
             }
 
+            // Połączenie do MS SQL z danych z App.config
 
+            string activeConnName = ConfigurationManager.AppSettings["ActiveConnection"];
+            var connSettings = ConfigurationManager.ConnectionStrings[activeConnName];
 
+            if (connSettings == null)
+            {
+                Console.WriteLine("Nie znaleziono połączenia w App.config.");
+                return;
+            }
 
+            string connectionString = connSettings.ConnectionString;
 
+            string sqlQuery = @"
+            SELECT TOP (10) *
+                  ,[DeactivationReason]
+            FROM [CityCard].[dbo].[vCityCardBlackList]
+            ORDER BY DeactivationDate DESC";
 
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            using (SqlCommand command = new SqlCommand(sqlQuery, connection))
+            {
+                try
+                {
+                    connection.Open();
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        Console.WriteLine("Wyniki zapytania:\n");
 
+                        // Wypisz kolumny
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            Console.Write(reader.GetName(i) + "\t");
+                        }
+                        Console.WriteLine("\n" + new string('-', 50));
 
-
-            string nr;
+                        // Wypisz wiersze
+                        while (reader.Read())
+                        {
+                            for (int i = 0; i < reader.FieldCount; i++)
+                            {
+                                Console.Write(reader[i]?.ToString() + "\t");
+                            }
+                            Console.WriteLine();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Błąd podczas zapytania: " + ex.Message);
+                }
+            }
 
             // 1. Pobieranie numeru automatu
+
+            string nr;
+                        
             while (true)
             {
                 Console.Write("Podaj numer automatu (maks. 3 cyfry): ");
