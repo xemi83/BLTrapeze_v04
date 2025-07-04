@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Configuration;
 using System.Data.SqlClient;
+using BLTrapeze_v04;
 //using Microsoft.Win32;
 
 namespace BLTrapeze_v0_4
@@ -14,116 +15,62 @@ namespace BLTrapeze_v0_4
         static void Main(string[] args)
         {
 
-            // dodawania wpisu do ODBC 32 PARADOX
+            Logger.Initialize(); // uruchomienie loggera
+            Logger.WriteLine("Program został uruchomiony.");
 
             // Tworzymy lub aktualizujemy DSN do Paradox
             CreateExactParadoxDsn();
 
-            //const string dsnName = "ParadoxT2";
-            //string baseKeyPath = $@"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\{dsnName}";
 
-            //using (RegistryKey key = Registry.LocalMachine.OpenSubKey(baseKeyPath, writable: true))
-            //{
-            //    if (key == null)
-            //    {
-            //        Console.WriteLine($"DSN '{dsnName}' nie istnieje.");
-            //        return;
-            //    }
-
-            //    bool modified = false;
-
-            //    // Parametry do sprawdzenia i ewentualnego nadpisania
-            //    modified |= EnsureValue(key, "Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
-            //    modified |= EnsureValue(key, "ParadoxNetPath", @"D:\BLTrapeze");
-            //    modified |= EnsureValue(key, "Database", @"D:\BLTrapeze");
-            //    modified |= EnsureValue(key, "CollatingSequence", "ASCII");
-            //    modified |= EnsureValue(key, "Exclusive", "FALSE");
-            //    modified |= EnsureValue(key, "PageTimeout", "5");
-            //    modified |= EnsureValue(key, "UserName", "bborowic");
-            //    modified |= EnsureValue(key, "SystemType", "3.x");
-
-            //    if (modified)
-            //    {
-            //        Console.WriteLine("Zaktualizowano konfigurację DSN.");
-            //    }
-            //    else
-            //    {
-            //        Console.WriteLine("DSN jest poprawnie skonfigurowany.");
-            //    }
-            //}
-
-
-
-
-            // Połączenie do MS SQL z danych z App.config
-
-            string activeConnName = ConfigurationManager.AppSettings["ActiveConnection"];
-            var connSettings = ConfigurationManager.ConnectionStrings[activeConnName];
-
-            if (connSettings == null)
-            {
-                Console.WriteLine("Nie znaleziono połączenia w App.config.");
-                return;
-            }
-
-            string connectionString = connSettings.ConnectionString;
-
-            // Test połączenia z bazą
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    connection.Open();
-                    Console.WriteLine(" Połączenie z bazą SQL zostało nawiązane.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(" Błąd podczas łączenia z bazą SQL:");
-                Console.WriteLine(ex.Message);
-            }
-
-            string connectionString2 = connSettings.ConnectionString;
-
+            // test zapytania z wykorzystaniem metody
+            // Zapytanie testowe do widoku vCityCardBlackList
             string sqlQuery = @"
             SELECT TOP (10) *
                   ,[DeactivationReason]
             FROM [CityCard].[dbo].[vCityCardBlackList]
             ORDER BY DeactivationDate DESC";
 
-            using (SqlConnection connection = new SqlConnection(connectionString2))
-            using (SqlCommand command = new SqlCommand(sqlQuery, connection))
+            try
             {
-                try
+                // Otwórz połączenie do bazy SQL za pomocą funkcji GetSqlConnectionFromConfig()
+                using (SqlConnection connection = GetSqlConnectionFromConfig())
                 {
-                    connection.Open();
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    // Utwórz polecenie SQL na podstawie zapytania i połączenia
+                    using (SqlCommand command = new SqlCommand(sqlQuery, connection))
                     {
-                        Console.WriteLine("Wyniki zapytania:\n");
-
-                        // Wypisz kolumny
-                        for (int i = 0; i < reader.FieldCount; i++)
+                        // Wykonaj zapytanie i pobierz wyniki
+                        using (SqlDataReader reader = command.ExecuteReader())
                         {
-                            Console.Write(reader.GetName(i) + "\t");
-                        }
-                        Console.WriteLine("\n" + new string('-', 50));
+                            Console.WriteLine("Wyniki zapytania:\n");
 
-                        // Wypisz wiersze
-                        while (reader.Read())
-                        {
+                            // Wypisz nagłówki kolumn
                             for (int i = 0; i < reader.FieldCount; i++)
                             {
-                                Console.Write(reader[i]?.ToString() + "\t");
+                                Console.Write(reader.GetName(i) + "\t");
                             }
-                            Console.WriteLine();
+                            Console.WriteLine("\n" + new string('-', 50));
+
+                            // Wypisz wiersze z danych
+                            while (reader.Read())
+                            {
+                                for (int i = 0; i < reader.FieldCount; i++)
+                                {
+                                    Console.Write(reader[i]?.ToString() + "\t");
+                                }
+                                Console.WriteLine(); // nowa linia po każdym wierszu
+                            }
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Błąd podczas zapytania: " + ex.Message);
-                }
             }
+            catch (Exception ex)
+            {
+                // Obsługa błędu połączenia lub zapytania
+                Console.WriteLine("Błąd podczas wykonywania zapytania:");
+                Console.WriteLine(ex.Message);
+            }
+
+            
 
             // 1. Pobieranie numeru automatu
 
@@ -307,7 +254,10 @@ namespace BLTrapeze_v0_4
                 Console.WriteLine("Błąd przy usuwaniu backupów: " + ex.Message);
             }
 
+
+
             Console.WriteLine("\nNaciśnij dowolny klawisz, aby zakończyć...");
+            Logger.WriteLine("Program zakończył działanie.");
             Console.ReadKey();
         }
 
@@ -355,6 +305,43 @@ namespace BLTrapeze_v0_4
             Console.WriteLine("DSN 'ParadoxT2' został odtworzony 1:1 jak w działającym środowisku.");
         }
 
+        static SqlConnection GetSqlConnectionFromConfig()
+        {
+            // Pobierz nazwę aktywnego połączenia z App.config
+            string activeConnName = ConfigurationManager.AppSettings["ActiveConnection"];
+            Logger.WriteLine($"Pobrano nazwę połączenia z App.config: {activeConnName}");
+
+            // Pobierz dane połączenia z connectionStrings
+            var connSettings = ConfigurationManager.ConnectionStrings[activeConnName];
+
+            // Jeśli nie znaleziono połączenia – zapisz do logu i zgłoś wyjątek
+            if (connSettings == null)
+            {
+                Logger.WriteLine("Błąd: nie znaleziono połączenia w App.config.");
+                throw new InvalidOperationException("Nie znaleziono połączenia w App.config.");
+            }
+
+            // Pobierz connection string i utwórz połączenie SQL
+            string connectionString = connSettings.ConnectionString;
+            Logger.WriteLine("Utworzono obiekt SqlConnection.");
+
+            try
+            {
+                // Otwórz połączenie do bazy
+                var connection = new SqlConnection(connectionString);
+                connection.Open();
+                Logger.WriteLine("Połączenie z bazą SQL zostało nawiązane.");
+
+                // Zwróć aktywne połączenie
+                return connection;
+            }
+            catch (Exception ex)
+            {
+                // Jeśli wystąpił błąd – zapisz szczegóły do logu
+                Logger.WriteLine("Błąd podczas łączenia z bazą SQL: " + ex.Message);
+                throw;
+            }
+        }
     }
 
 
