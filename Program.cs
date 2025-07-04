@@ -7,7 +7,7 @@ using System.Configuration;
 using System.Data.SqlClient;
 //using Microsoft.Win32;
 
-namespace BLTrapeze_v0_3
+namespace BLTrapeze_v0_4
 {
     class Program
     {
@@ -16,39 +16,44 @@ namespace BLTrapeze_v0_3
 
             // dodawania wpisu do ODBC 32 PARADOX
 
+            // Tworzymy lub aktualizujemy DSN do Paradox
+            CreateExactParadoxDsn();
 
-            const string dsnName = "ParadoxT2";
-            string baseKeyPath = $@"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\{dsnName}";
+            //const string dsnName = "ParadoxT2";
+            //string baseKeyPath = $@"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\{dsnName}";
 
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(baseKeyPath, writable: true))
-            {
-                if (key == null)
-                {
-                    Console.WriteLine($"DSN '{dsnName}' nie istnieje.");
-                    return;
-                }
+            //using (RegistryKey key = Registry.LocalMachine.OpenSubKey(baseKeyPath, writable: true))
+            //{
+            //    if (key == null)
+            //    {
+            //        Console.WriteLine($"DSN '{dsnName}' nie istnieje.");
+            //        return;
+            //    }
 
-                bool modified = false;
+            //    bool modified = false;
 
-                // Parametry do sprawdzenia i ewentualnego nadpisania
-                modified |= EnsureValue(key, "Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
-                modified |= EnsureValue(key, "ParadoxNetPath", @"D:\KKM33");
-                modified |= EnsureValue(key, "Database", @"D:\KKM33");
-                modified |= EnsureValue(key, "CollatingSequence", "ASCII");
-                modified |= EnsureValue(key, "Exclusive", "FALSE");
-                modified |= EnsureValue(key, "PageTimeout", "5");
-                modified |= EnsureValue(key, "UserName", "bborowic");
-                modified |= EnsureValue(key, "SystemType", "3.x");
+            //    // Parametry do sprawdzenia i ewentualnego nadpisania
+            //    modified |= EnsureValue(key, "Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
+            //    modified |= EnsureValue(key, "ParadoxNetPath", @"D:\BLTrapeze");
+            //    modified |= EnsureValue(key, "Database", @"D:\BLTrapeze");
+            //    modified |= EnsureValue(key, "CollatingSequence", "ASCII");
+            //    modified |= EnsureValue(key, "Exclusive", "FALSE");
+            //    modified |= EnsureValue(key, "PageTimeout", "5");
+            //    modified |= EnsureValue(key, "UserName", "bborowic");
+            //    modified |= EnsureValue(key, "SystemType", "3.x");
 
-                if (modified)
-                {
-                    Console.WriteLine("Zaktualizowano konfigurację DSN.");
-                }
-                else
-                {
-                    Console.WriteLine("DSN jest poprawnie skonfigurowany.");
-                }
-            }
+            //    if (modified)
+            //    {
+            //        Console.WriteLine("Zaktualizowano konfigurację DSN.");
+            //    }
+            //    else
+            //    {
+            //        Console.WriteLine("DSN jest poprawnie skonfigurowany.");
+            //    }
+            //}
+
+
+
 
             // Połączenie do MS SQL z danych z App.config
 
@@ -63,13 +68,30 @@ namespace BLTrapeze_v0_3
 
             string connectionString = connSettings.ConnectionString;
 
+            // Test połączenia z bazą
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    Console.WriteLine(" Połączenie z bazą SQL zostało nawiązane.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(" Błąd podczas łączenia z bazą SQL:");
+                Console.WriteLine(ex.Message);
+            }
+
+            string connectionString2 = connSettings.ConnectionString;
+
             string sqlQuery = @"
             SELECT TOP (10) *
                   ,[DeactivationReason]
             FROM [CityCard].[dbo].[vCityCardBlackList]
             ORDER BY DeactivationDate DESC";
 
-            using (SqlConnection connection = new SqlConnection(connectionString))
+            using (SqlConnection connection = new SqlConnection(connectionString2))
             using (SqlCommand command = new SqlCommand(sqlQuery, connection))
             {
                 try
@@ -135,10 +157,10 @@ namespace BLTrapeze_v0_3
             }
 
             // 3. Ścieżki plików
-            string dbFile = @"D:\KKM33\CardListTest.db";
-            string pxFile = @"D:\KKM33\CardListTest.px";
-            string dbBackup = @"D:\KKM33\CardListTest_backup.db";
-            string pxBackup = @"D:\KKM33\CardListTest_backup.px";
+            string dbFile = @"D:\BLTrapeze\CardListTest.db";
+            string pxFile = @"D:\BLTrapeze\CardListTest.px";
+            string dbBackup = @"D:\BLTrapeze\CardListTest_backup.db";
+            string pxBackup = @"D:\BLTrapeze\CardListTest_backup.px";
 
             // 4. Kopia zapasowa plików
             try
@@ -163,8 +185,7 @@ namespace BLTrapeze_v0_3
 
             // 5. INSERT do bazy
             string connStr = "DSN=ParadoxT2;";
-            string csvFile = @"D:\KKM33\BLfull.csv";
-            //int limit = 1000; // <== ZMIENNA DO KONTROLI ILOŚCI WIERSZY
+            string csvFile = @"D:\BLTrapeze\BLfull.csv";
 
             int limit = 0;
             while (true)
@@ -190,7 +211,7 @@ namespace BLTrapeze_v0_3
                 using (OdbcConnection conn = new OdbcConnection(connStr))
                 {
                     conn.Open();
-                    Console.WriteLine("Połączono z bazą.");
+                    Console.WriteLine("Połączono z bazą PARADOX.");
 
                     string[] lines = File.ReadAllLines(csvFile);
 
@@ -228,7 +249,7 @@ namespace BLTrapeze_v0_3
                         using (OdbcCommand cmd = new OdbcCommand(query, conn))
                         {
                             int rows = cmd.ExecuteNonQuery();
-                            Console.WriteLine($"Wstawiono {rows} wiersz(y) z CSV (linia {i + 1}).");
+                            Console.WriteLine($"Wstawiono {rows} wiersz(y) z CSV (linia {i + 1}), CadrId: {cardId}.");
                         }
                     }
                 }
@@ -291,16 +312,47 @@ namespace BLTrapeze_v0_3
         }
 
 
-        static bool EnsureValue(RegistryKey key, string name, string expectedValue)
+        // Funkcja sprawdza, czy źródło danych ODBC o nazwie ParadoxT2 istnieje.
+        // Jeśli nie istnieje — tworzy je. Jeśli istnieje — sprawdza i aktualizuje parametry.
+        static void CreateExactParadoxDsn()
         {
-            var currentValue = key.GetValue(name)?.ToString();
-            if (currentValue != expectedValue)
+            const string dsnName = "ParadoxT2";
+
+            // Ścieżki rejestru
+            string dsnKeyPath = $@"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\{dsnName}";
+            string odbcListPath = @"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\ODBC Data Sources";
+
+            // Usuwanie starego wpisu jeśli istnieje
+            Registry.LocalMachine.DeleteSubKeyTree(dsnKeyPath, false);
+            using (var sourcesKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
             {
-                key.SetValue(name, expectedValue);
-                Console.WriteLine($"Zmieniono {name}: '{currentValue}' → '{expectedValue}'");
-                return true;
+                sourcesKey?.DeleteValue(dsnName, false);
             }
-            return false;
+
+            // Tworzenie nowego DSN
+            using (var dsnKey = Registry.LocalMachine.CreateSubKey(dsnKeyPath))
+            {
+                dsnKey.SetValue("CollatingSequence", "ASCII");
+                dsnKey.SetValue("Database", @"D:\BLTrapeze");
+                dsnKey.SetValue("DefaultDir", @"D:\BLTrapeze");
+                dsnKey.SetValue("Description", "ParadoxT2");
+                dsnKey.SetValue("Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
+                dsnKey.SetValue("DriverId", "538");
+                dsnKey.SetValue("Exclusive", "FALSE");
+                dsnKey.SetValue("FIL", "Paradox 5.X");
+                dsnKey.SetValue("PageTimeout", "5");
+                dsnKey.SetValue("ParadoxNetPath", @"D:\BLTrapeze");
+                dsnKey.SetValue("SystemType", "3.x");
+                dsnKey.SetValue("UserName", "bborowic");
+            }
+
+            // Dodanie do listy ODBC
+            using (var listKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
+            {
+                listKey?.SetValue(dsnName, "Microsoft Paradox Driver (*.db )");
+            }
+
+            Console.WriteLine("DSN 'ParadoxT2' został odtworzony 1:1 jak w działającym środowisku.");
         }
 
     }
