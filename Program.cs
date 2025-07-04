@@ -266,44 +266,63 @@ namespace BLTrapeze_v0_4
         // Jeśli nie istnieje — tworzy je. Jeśli istnieje — sprawdza i aktualizuje parametry.
         static void CreateExactParadoxDsn()
         {
+            // Nazwa źródła danych ODBC (DSN)
             const string dsnName = "ParadoxT2";
 
-            // Ścieżki rejestru
+            // Ścieżki rejestru do konfiguracji DSN
             string dsnKeyPath = $@"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\{dsnName}";
             string odbcListPath = @"SOFTWARE\WOW6432Node\ODBC\ODBC.INI\ODBC Data Sources";
 
-            // Usuwanie starego wpisu jeśli istnieje
-            Registry.LocalMachine.DeleteSubKeyTree(dsnKeyPath, false);
-            using (var sourcesKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
+            try
             {
-                sourcesKey?.DeleteValue(dsnName, false);
-            }
+                // Usuń istniejący wpis DSN, jeśli występuje
+                Registry.LocalMachine.DeleteSubKeyTree(dsnKeyPath, false);
+                Logger.WriteLine($"Usunięto istniejący klucz rejestru: {dsnKeyPath}");
 
-            // Tworzenie nowego DSN
-            using (var dsnKey = Registry.LocalMachine.CreateSubKey(dsnKeyPath))
+                using (var sourcesKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
+                {
+                    sourcesKey?.DeleteValue(dsnName, false);
+                    Logger.WriteLine($"Usunięto wpis z listy źródeł danych ODBC: {dsnName}");
+                }
+
+                // Utwórz nowy wpis DSN z pełną konfiguracją
+                using (var dsnKey = Registry.LocalMachine.CreateSubKey(dsnKeyPath))
+                {
+                    dsnKey.SetValue("CollatingSequence", "ASCII");
+                    dsnKey.SetValue("Database", @"D:\BLTrapeze");
+                    dsnKey.SetValue("DefaultDir", @"D:\BLTrapeze");
+                    dsnKey.SetValue("Description", "ParadoxT2");
+                    dsnKey.SetValue("Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
+                    dsnKey.SetValue("DriverId", "538");
+                    dsnKey.SetValue("Exclusive", "FALSE");
+                    dsnKey.SetValue("FIL", "Paradox 5.X");
+                    dsnKey.SetValue("PageTimeout", "5");
+                    dsnKey.SetValue("ParadoxNetPath", @"D:\BLTrapeze");
+                    dsnKey.SetValue("SystemType", "3.x");
+                    dsnKey.SetValue("UserName", "bborowic");
+
+                    Logger.WriteLine($"Utworzono nowy wpis rejestru DSN: {dsnKeyPath}");
+                }
+
+                // Dodaj wpis do globalnej listy źródeł danych ODBC
+                using (var listKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
+                {
+                    listKey?.SetValue(dsnName, "Microsoft Paradox Driver (*.db )");
+                    Logger.WriteLine($"Zarejestrowano DSN '{dsnName}' w ODBC Data Sources.");
+                }
+
+                // Potwierdzenie zakończenia operacji
+                Console.WriteLine("DSN 'ParadoxT2' został odtworzony 1:1 jak w działającym środowisku.");
+                Logger.WriteLine("Zakończono konfigurację DSN 'ParadoxT2'.");
+            }
+            catch (Exception ex)
             {
-                dsnKey.SetValue("CollatingSequence", "ASCII");
-                dsnKey.SetValue("Database", @"D:\BLTrapeze");
-                dsnKey.SetValue("DefaultDir", @"D:\BLTrapeze");
-                dsnKey.SetValue("Description", "ParadoxT2");
-                dsnKey.SetValue("Driver", @"C:\Program Files (x86)\Common Files\Borland Shared\BDE\IDAPI32.DLL");
-                dsnKey.SetValue("DriverId", "538");
-                dsnKey.SetValue("Exclusive", "FALSE");
-                dsnKey.SetValue("FIL", "Paradox 5.X");
-                dsnKey.SetValue("PageTimeout", "5");
-                dsnKey.SetValue("ParadoxNetPath", @"D:\BLTrapeze");
-                dsnKey.SetValue("SystemType", "3.x");
-                dsnKey.SetValue("UserName", "bborowic");
+                // W przypadku błędu zapisz szczegóły do logu
+                Logger.WriteLine("Błąd podczas tworzenia DSN 'ParadoxT2': " + ex.Message);
+                throw;
             }
-
-            // Dodanie do listy ODBC
-            using (var listKey = Registry.LocalMachine.OpenSubKey(odbcListPath, writable: true))
-            {
-                listKey?.SetValue(dsnName, "Microsoft Paradox Driver (*.db )");
-            }
-
-            Console.WriteLine("DSN 'ParadoxT2' został odtworzony 1:1 jak w działającym środowisku.");
         }
+
 
         static SqlConnection GetSqlConnectionFromConfig()
         {
